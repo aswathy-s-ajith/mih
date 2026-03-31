@@ -12,7 +12,7 @@ import {
   Menu,
   X
 } from 'lucide-react';
-
+import { Link } from 'react-router-dom';
 // --- Reusable Components ---
 
 const Navbar = () => (
@@ -28,12 +28,9 @@ const Navbar = () => (
       <a href="#how-it-works" className="hover:text-indigo-600 transition-colors">How it Works</a>
       <a href="#use-cases" className="hover:text-indigo-600 transition-colors">Use Cases</a>
     </div>
-    <div className="flex items-center gap-4">
-      <button className="text-sm font-medium text-slate-600 hover:text-slate-900">Log in</button>
-      <button className="bg-slate-900 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-slate-800 transition-all">
-        Get Started
-      </button>
-    </div>
+        <div className="flex items-center gap-6">
+          <Link to="/auth" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Log in</Link>
+        </div>
   </nav>
 );
 

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Home from './pages/Home'
+import Auth from './pages/Auth';
 import Upload from './pages/Upload'
 import MeetingDetail from './pages/MeetingDetail'
 
@@ -8,6 +9,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/auth" element={<Auth />} />
         <Route path="/upload" element={<Upload />} />
         <Route path="/meeting/:id" element={<MeetingDetail />} />
       </Routes>
