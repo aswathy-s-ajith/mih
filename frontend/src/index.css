@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+/* If you have a custom config file, v4 handles it automatically 
+   as long as the PostCSS plugin is pointing to the right place. */
