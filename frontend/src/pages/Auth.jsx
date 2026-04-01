@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
+import {supabase} from "../lib/supabase"
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -23,28 +24,68 @@ export default function AuthPage() {
     confirmPassword: ''
   });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-    
-    // Simulate Supabase/Auth logic
-    setTimeout(() => {
-      if (isLogin && formData.email === 'error@test.com') {
-        setError('Invalid login credentials. Please try again.');
-        setIsLoading(false);
-      } else {
-        setIsSuccess(true);
-        setIsLoading(false);
-      }
-    }, 1500);
+  const handleGoogleLogin = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+    });
   };
+
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  setIsLoading(true);
+  setError("");
+
+  try {
+    if (isLogin) {
+      // 🔐 LOGIN
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (error) throw error;
+
+      console.log("Logged in:", data);
+      setIsSuccess(true);
+
+      // 👉 later: navigate("/dashboard")
+
+    } else {
+      // 🆕 SIGNUP
+
+      // basic validation
+      if (formData.password !== formData.confirmPassword) {
+        throw new Error("Passwords do not match");
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            name: formData.name, // optional
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      console.log("User created:", data);
+      setIsSuccess(true);
+    }
+
+  } catch (err) {
+    setError(err.message);
+  }
+
+  setIsLoading(false);
+};
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  if (isSuccess) {
+  if (isSuccess && !isLogin) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-6">
         <div className="text-center animate-in fade-in zoom-in duration-300">
@@ -111,7 +152,10 @@ export default function AuthPage() {
             </div>
 
             {/* Social Login */}
-            <button className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-slate-200 rounded-xl text-slate-700 font-medium hover:bg-slate-50 transition-colors mb-6 group">
+            <button 
+              onClick={handleGoogleLogin}
+              className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-slate-200 rounded-xl text-slate-700 font-medium hover:bg-slate-50 transition-colors mb-6 group"
+            >
               <img src="https://www.svgrepo.com/show/355037/google.svg" className="w-5 h-5" alt="Google" />
               Continue with Google
             </button>
