@@ -42,10 +42,11 @@ const StatCard = ({ label, value, icon: Icon, trend }) => (
 );
 
 export default function Dashboard() {
+    const fileInputRef = useRef(null);
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [isUploading, setIsUploading] = useState(false);
-
+ī
   // --- 1. State Management ---
   const [user, setUser] = useState(null);
   const [projects, setProjects] = useState([]);
