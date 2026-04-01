@@ -39,7 +39,7 @@ The platform provides a seamless upload experience where users can submit `.txt`
 - **Uvicorn** - ASGI server
 - **Groq API** - AI model for insight extraction (llama-3.1-8b-instant)
 - **Supabase Python Client** - Database and auth integration
-- **SQLAlchemy** - Database ORM
+
 
 ### Database
 - **Supabase** (PostgreSQL) - Cloud database with:
@@ -109,14 +109,14 @@ pip install -r requirements.txt
 #### Configure Environment Variables
 Create `backend/.env`:
 ```
-DATABASE_URL=postgresql://user:password@host:port/database
+
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-anon-key
 GROQ_API_KEY=gsk_your-groq-api-key
 ```
 
 **How to get credentials:**
-- **DATABASE_URL & SUPABASE_URL & SUPABASE_KEY**: From Supabase project settings
+- **SUPABASE_URL & SUPABASE_KEY**: From Supabase project settings
 - **GROQ_API_KEY**: Get free API key from [Groq Console](https://console.groq.com)
 
 #### Run Backend Server
@@ -140,145 +140,6 @@ npm run dev
 ```
 
 Then open `http://localhost:5173` in your browser.
-
----
-
-## Key Features
-
-### 📊 Dashboard
-- Real-time statistics (projects, transcripts, action items)
-- Recent transcripts table with word count and dates
-- Key insights sidebar showing decisions and pending actions
-- User profile and logout functionality
-
-### 📁 Project Management
-- Create and manage multiple projects
-- Organize transcripts by project
-- Track project-specific insights
-
-### 🎤 Transcript Upload
-- Upload `.txt` or `.vtt` transcript files
-- Automatic AI processing
-- Real-time word count calculation
-- Instant results display
-
-### 🤖 AI Analysis
-- Extracts decisions (final agreements)
-- Identifies action items with owners and due dates
-- Uses Groq's llama-3.1-8b-instant model
-- Fast processing with low latency
-
-### 🔐 Authentication
-- Email/password signup and login
-- Social login with Google (OAuth)
-- Secure session management
-- User profile with email and avatar
-
----
-
-## Project Structure
-
-```
-mih/
-├── frontend/                    # React + Vite frontend
-│   ├── src/
-│   │   ├── components/          # Reusable React components
-│   │   │   └── Dashboard.jsx
-│   │   ├── pages/               # Page components
-│   │   │   ├── Auth.jsx
-│   │   │   ├── Home.jsx
-│   │   │   ├── Upload.jsx
-│   │   │   └── MeetingDetail.jsx
-│   │   ├── lib/
-│   │   │   └── supabase.js
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── package.json
-│   ├── vite.config.js
-│   └── tailwind.config.js
-│
-├── backend/                     # FastAPI backend
-│   ├── main.py                  # API endpoints
-│   ├── database.py              # Database initialization
-│   ├── models.py                # Pydantic models
-│   ├── requirements.txt
-│   ├── .env.example
-│   └── README.md
-│
-├── .gitignore
-└── README.md
-```
-
----
-
-## API Endpoints
-
-### Health Check
-```
-GET /health
-Response: { "status": "ok" }
-```
-
-### Upload Transcript
-```
-POST /upload
-Content-Type: multipart/form-data
-
-Parameters:
-- file: .txt or .vtt file (required)
-- project_id: integer (optional, default: 1)
-
-Response:
-{
-  "success": true,
-  "transcript_id": 123,
-  "message": "Transcript processed successfully"
-}
-```
-
----
-
-## Future Enhancements
-
-- [ ] Chat with AI about processed transcripts
-- [ ] Sentiment analysis visualization
-- [ ] Speaker diarization and labeling
-- [ ] Export insights to PDF/Word
-- [ ] Team collaboration and sharing
-- [ ] Calendar integration for meeting context
-- [ ] Automated follow-up reminders
-- [ ] Multi-language support
-
----
-
-## Troubleshooting
-
-### Backend Won't Start
-- **Error**: `DATABASE_URL environment variable is not set`
-  - **Fix**: Ensure `.env` exists in `backend/` with correct `DATABASE_URL`
-
-- **Error**: `Can't load plugin: sqlalchemy.dialects:https`
-  - **Fix**: Use `DATABASE_URL` (postgresql://...) not `SUPABASE_URL` (https://...)
-
-### Frontend Build Errors
-- **Error**: React compiler import missing
-  - **Fix**: Remove `reactCompilerPreset()` from `vite.config.js`
-
-### Upload Fails
-- **Error**: `Upload failed: Connection refused`
-  - **Fix**: Ensure backend is running on `http://localhost:8000`
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
 
 ## License
 
