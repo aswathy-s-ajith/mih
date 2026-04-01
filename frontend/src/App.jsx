@@ -3,6 +3,7 @@ import Home from './pages/Home'
 import Auth from './pages/Auth';
 import Upload from './pages/Upload'
 import MeetingDetail from './pages/MeetingDetail'
+import Dashboard from './components/Dashboard'
 
 export default function App() {
   return (
@@ -10,6 +11,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/auth" element={<Auth />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/upload" element={<Upload />} />
         <Route path="/meeting/:id" element={<MeetingDetail />} />
       </Routes>
