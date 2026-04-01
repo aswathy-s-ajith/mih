@@ -47,6 +47,7 @@ export default function Dashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
+  const [viewingTranscript, setViewingTranscript] = useState(null); // Added state for viewing file content
 
   // --- 2. Initialization ---
   useEffect(() => {
@@ -210,8 +211,8 @@ export default function Dashboard() {
 
         <div className="flex-1 overflow-y-auto p-8 space-y-8 max-w-7xl mx-auto w-full print:p-0">
           
-          {/* --- VIEW 1: GLOBAL DASHBOARD --- */}
           {!selectedProjectId ? (
+            /* --- VIEW 1: GLOBAL DASHBOARD --- */
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard label="Total Projects" value={loading ? "..." : projects.length} icon={FolderRoot} trend="Active" />
@@ -262,7 +263,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex gap-2">
                   <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".txt,.vtt" className="hidden" />
-                  <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 disabled:opacity-50 transition-all">
+                  <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 disabled:opacity-50 shadow-lg shadow-slate-200 transition-all">
                     {isUploading ? <Loader2 className="animate-spin" size={18} /> : <FileUp size={18} />}
                     {isUploading ? "Extracting..." : "Upload Transcript"}
                   </button>
@@ -344,7 +345,13 @@ export default function Dashboard() {
                               <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">{t.word_count} Words • {formatDate(t.created_at)}</p>
                             </div>
                           </div>
-                          <button className="text-indigo-600 hover:text-indigo-800 font-bold text-xs transition-colors">View File</button>
+                          {/* FIXED BUTTON: Click will now trigger the modal below */}
+                          <button 
+                            onClick={() => setViewingTranscript(t)}
+                            className="text-indigo-600 hover:text-indigo-800 font-bold text-xs transition-colors"
+                          >
+                            View File
+                          </button>
                         </div>
                       ))}
                       {projectTranscripts.length === 0 && (
@@ -357,6 +364,29 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* MODAL: VIEW TRANSCRIPT CONTENT (FIXED FEATURE) */}
+        {viewingTranscript && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl w-full max-w-4xl p-8 shadow-2xl animate-in zoom-in duration-300 max-h-[85vh] flex flex-col">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-xl font-bold">{viewingTranscript.filename}</h3>
+                  <p className="text-xs text-slate-400 uppercase font-bold tracking-widest mt-1">Transcript Content</p>
+                </div>
+                <button onClick={() => setViewingTranscript(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24}/></button>
+              </div>
+              <div className="flex-1 overflow-y-auto bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                <pre className="text-sm text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">
+                  {viewingTranscript.content || "This transcript has no content saved."}
+                </pre>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button onClick={() => setViewingTranscript(null)} className="bg-slate-900 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-slate-800 transition-all">Close Viewer</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* MODAL: NEW PROJECT */}
         {showProjectModal && (
