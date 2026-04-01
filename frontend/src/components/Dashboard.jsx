@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard, FolderRoot, FileText, Lightbulb, 
   MessageSquare, Search, Plus, LogOut, MoreVertical, 
-  CheckCircle2, Send, FileUp, Loader2, X, Check, ChevronRight, Download
+  CheckCircle2, Send, FileUp, Loader2, X, Check, ChevronRight, Download, FileType
 } from 'lucide-react';
 import { supabase } from "../lib/supabase";
 import { useNavigate } from 'react-router-dom';
@@ -78,7 +78,7 @@ export default function Dashboard() {
     }
   };
 
-  // --- 3. Feature: CSV Export ---
+  // --- 3. Export Logic ---
   const handleExportCSV = () => {
     if (projectDecisions.length === 0) return alert("No data to export");
     
@@ -93,6 +93,10 @@ export default function Dashboard() {
     a.setAttribute('href', url);
     a.setAttribute('download', `${activeProject.name}_Insights.csv`);
     a.click();
+  };
+
+  const handleExportPDF = () => {
+    window.print();
   };
 
   // --- 4. Handlers ---
@@ -149,10 +153,10 @@ export default function Dashboard() {
   const userInitials = userDisplayName.substring(0, 2).toUpperCase();
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC] font-sans text-slate-900">
+    <div className="flex min-h-screen bg-[#F8FAFC] font-sans text-slate-900 print:bg-white">
       
       {/* SIDEBAR */}
-      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col p-6 sticky top-0 h-screen">
+      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col p-6 sticky top-0 h-screen print:hidden">
         <div className="flex items-center gap-2 mb-10 px-2 cursor-pointer" onClick={() => setSelectedProjectId(null)}>
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-200">
             <div className="w-4 h-4 bg-white rounded-sm rotate-45" />
@@ -185,7 +189,7 @@ export default function Dashboard() {
       <main className="flex-1 flex flex-col overflow-hidden">
         
         {/* TOP BAR */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-10">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-10 print:hidden">
           <div className="flex items-center gap-2 text-sm font-medium">
             <span className={`cursor-pointer ${!selectedProjectId ? 'text-slate-900 font-bold' : 'text-slate-400 hover:text-slate-600'}`} onClick={() => setSelectedProjectId(null)}>
               Dashboard
@@ -204,7 +208,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-8 max-w-7xl mx-auto w-full">
+        <div className="flex-1 overflow-y-auto p-8 space-y-8 max-w-7xl mx-auto w-full print:p-0">
           
           {/* --- VIEW 1: GLOBAL DASHBOARD --- */}
           {!selectedProjectId ? (
@@ -249,26 +253,32 @@ export default function Dashboard() {
               </div>
             </>
           ) : (
-            /* --- VIEW 2: PROJECT DETAIL VIEW (Restructured for Extractors) --- */
+            /* --- VIEW 2: PROJECT DETAIL VIEW --- */
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center print:hidden">
                 <div>
                   <h2 className="text-3xl font-bold text-slate-900">{activeProject.name}</h2>
                   <p className="text-slate-500 text-sm mt-1">Accepting .TXT and .VTT transcript formats.</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-2">
                   <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".txt,.vtt" className="hidden" />
-                  <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 disabled:opacity-50 shadow-lg shadow-slate-200 transition-all">
+                  <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 disabled:opacity-50 transition-all">
                     {isUploading ? <Loader2 className="animate-spin" size={18} /> : <FileUp size={18} />}
                     {isUploading ? "Extracting..." : "Upload Transcript"}
                   </button>
-                  <button 
-                    onClick={handleExportCSV}
-                    className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all"
-                  >
-                    <Download size={16} /> Export CSV
+                  <button onClick={handleExportCSV} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all">
+                    <Download size={16} /> CSV
+                  </button>
+                  <button onClick={handleExportPDF} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all">
+                    <FileType size={16} /> PDF
                   </button>
                 </div>
+              </div>
+
+              {/* Print Header */}
+              <div className="hidden print:block border-b-2 border-slate-200 pb-4 mb-6">
+                <h1 className="text-2xl font-bold">{activeProject.name} - Meeting Insights</h1>
+                <p className="text-slate-500 text-sm">Generated on {new Date().toLocaleDateString()}</p>
               </div>
 
               <div className="grid grid-cols-1 gap-8">
@@ -316,6 +326,32 @@ export default function Dashboard() {
                       )}
                     </tbody>
                   </table>
+                </div>
+
+                {/* PROJECT TRANSCRIPTS LIST */}
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm print:hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 font-bold text-sm bg-slate-50/50 flex items-center gap-2">
+                    <FileText size={16} className="text-slate-500" /> Transcripts in this Project
+                  </div>
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {projectTranscripts.map(t => (
+                        <div key={t.id} className="flex items-center justify-between p-4 border rounded-xl bg-slate-50/50">
+                          <div className="flex items-center gap-3">
+                            <FileText size={18} className="text-slate-400" />
+                            <div>
+                              <p className="text-sm font-bold">{t.filename}</p>
+                              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">{t.word_count} Words • {formatDate(t.created_at)}</p>
+                            </div>
+                          </div>
+                          <button className="text-indigo-600 hover:text-indigo-800 font-bold text-xs transition-colors">View File</button>
+                        </div>
+                      ))}
+                      {projectTranscripts.length === 0 && (
+                        <p className="col-span-2 text-center text-slate-400 text-sm italic py-4">No transcripts uploaded to this project.</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
