@@ -8,3 +8,4 @@ openai==0.28.1
 psycopg2-binary==2.9.9
 PyJWT==2.8.0
 groq
+sentence-transformers

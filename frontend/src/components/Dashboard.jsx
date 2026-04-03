@@ -51,6 +51,12 @@ export default function Dashboard() {
   const [newProjectName, setNewProjectName] = useState("");
   const [viewingTranscript, setViewingTranscript] = useState(null);
 
+  // --- NEW: Chat States ---
+  const [chatInput, setChatInput] = useState("");
+  const [chatHistory, setChatHistory] = useState([]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+
 
   // --- 2. Initialization ---
   useEffect(() => {
@@ -118,24 +124,25 @@ export default function Dashboard() {
       setShowProjectModal(false);
     } catch (error) { alert(error.message); }
   };
+
   const handleDeleteTranscript = async (transcriptId) => {
-  if (!window.confirm("Are you sure you want to delete this transcript?")) return;
+    if (!window.confirm("Are you sure you want to delete this transcript?")) return;
 
-  try {
-    const { error } = await supabase
-      .from('transcripts')
-      .delete()
-      .eq('id', transcriptId);
+    try {
+      const { error } = await supabase
+        .from('transcripts')
+        .delete()
+        .eq('id', transcriptId);
 
-    if (error) throw error;
+      if (error) throw error;
 
-    // Refresh data after deletion
-    await fetchDashboardData();
-    alert("Transcript deleted successfully");
-  } catch (error) {
-    alert("Error deleting: " + error.message);
-  }
-};
+      await fetchDashboardData();
+      alert("Transcript deleted successfully");
+    } catch (error) {
+      alert("Error deleting: " + error.message);
+    }
+  };
+
   // SECURED UPLOAD LOGIC
   const handleFileSelect = async (event) => {
     const files = Array.from(event.target.files || []);
@@ -203,6 +210,48 @@ export default function Dashboard() {
     }
   };
 
+  // --- NEW: Chat Handler ---
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    const trimmedInput = chatInput.trim();
+    if (!trimmedInput || !selectedProjectId) return;
+
+    const userMessage = { role: 'user', content: trimmedInput };
+    setChatHistory(prev => [...prev, userMessage]);
+    setChatInput("");
+    setIsChatLoading(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Session expired. Please login again.");
+
+      const response = await fetch('http://localhost:8000/chat', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          project_id: selectedProjectId,
+          question: trimmedInput
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Chat failed");
+
+      setChatHistory(prev => [...prev, { 
+        role: 'assistant', 
+        content: data.answer, 
+        sources: data.sources 
+      }]);
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
   // --- 5. Filtering Logic for Project View ---
   const activeProject = projects.find(p => p.id === selectedProjectId);
   const projectTranscripts = transcripts.filter(t => t.project_id === selectedProjectId);
@@ -228,7 +277,15 @@ export default function Dashboard() {
         <nav className="flex-1 space-y-1">
           <SidebarItem icon={LayoutDashboard} label="Dashboard" active={!selectedProjectId} onClick={() => setSelectedProjectId(null)} />
           <SidebarItem icon={FolderRoot} label="Projects" active={!!selectedProjectId} onClick={() => setSelectedProjectId(null)} />
-          <SidebarItem icon={MessageSquare} label="AI Chat" onClick={() => alert("Chat page coming soon!")} />
+          <SidebarItem 
+            icon={MessageSquare} 
+            label="AI Chat" 
+            active={showChat}
+            onClick={() => {
+               if (selectedProjectId) setShowChat(true);
+               else alert("Please select a project first to start chatting!");
+            }} 
+          />
         </nav>
 
         <div className="pt-6 border-t border-slate-100 space-y-1">
@@ -247,7 +304,7 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden relative">
         
         {/* TOP BAR */}
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-10 print:hidden">
@@ -380,11 +437,6 @@ export default function Dashboard() {
                 </div>
               )}
 
-              <div className="hidden print:block border-b-2 border-slate-200 pb-4 mb-6">
-                <h1 className="text-2xl font-bold">{activeProject.name} - Meeting Insights</h1>
-                <p className="text-slate-500 text-sm">Generated on {new Date().toLocaleDateString()}</p>
-              </div>
-
               <div className="grid grid-cols-1 gap-8">
                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                   <div className="px-6 py-4 border-b border-slate-100 font-bold text-sm bg-slate-50/50">Decisions (Final Agreements)</div>
@@ -449,7 +501,6 @@ export default function Dashboard() {
                             >
                               View File
                             </button>
-                            {/* ADD THIS DELETE BUTTON */}
                             <button 
                               onClick={() => handleDeleteTranscript(t.id)} 
                               className="text-red-500 hover:text-red-700 font-bold text-xs"
@@ -467,6 +518,7 @@ export default function Dashboard() {
           )}
         </div>
 
+        {/* MODALS */}
         {viewingTranscript && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl w-full max-w-4xl p-8 shadow-2xl animate-in zoom-in duration-300 max-h-[85vh] flex flex-col">
@@ -503,6 +555,93 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* --- FLOATING CHAT TOGGLE BUTTON --- */}
+        {selectedProjectId && !showChat && (
+          <button 
+            onClick={() => setShowChat(true)}
+            className="fixed bottom-8 right-8 bg-indigo-600 text-white p-4 rounded-2xl shadow-2xl hover:bg-indigo-700 transition-all z-40 flex items-center gap-2 group"
+          >
+            <MessageSquare size={24} />
+            <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-500 font-bold">Ask AI</span>
+          </button>
+        )}
+
+        {/* --- SLIDE-OVER CHAT PANEL --- */}
+        <div className={`fixed top-0 right-0 h-screen w-[400px] bg-white border-l border-slate-200 shadow-2xl z-[150] transition-transform duration-300 transform ${showChat ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className="flex flex-col h-full">
+            {/* Chat Header */}
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="font-bold text-slate-900">Project AI Chat</h3>
+                <p className="text-[10px] text-indigo-600 font-bold uppercase tracking-widest">RAG Context Enabled</p>
+              </div>
+              <button onClick={() => setShowChat(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={20}/></button>
+            </div>
+
+            {/* Chat Messages Area */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#F8FAFC]">
+              {chatHistory.length === 0 && (
+                <div className="text-center mt-10">
+                  <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Lightbulb size={32} />
+                  </div>
+                  <p className="text-sm font-bold text-slate-900">Ask anything about this project</p>
+                  <p className="text-xs text-slate-400 mt-1 px-10">"What were the budget concerns?" or "Summarize the tech stack discussion."</p>
+                </div>
+              )}
+              
+              {chatHistory.map((msg, idx) => (
+                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] p-4 rounded-2xl text-sm ${
+                    msg.role === 'user' 
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100 rounded-tr-none' 
+                      : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'
+                  }`}>
+                    {msg.content}
+                    {msg.sources && msg.sources.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <p className="text-[9px] uppercase font-bold text-slate-400 tracking-tighter">Sources Found</p>
+                        <div className="flex gap-1 mt-1">
+                          {msg.sources.slice(0, 3).map((s, i) => (
+                            <span key={i} title={s.snippet} className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded text-[8px] border border-slate-200">Ref {i+1}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              
+              {isChatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-white border border-slate-200 p-4 rounded-2xl rounded-tl-none">
+                    <Loader2 className="animate-spin text-indigo-600" size={18} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Chat Input Area */}
+            <form onSubmit={handleSendMessage} className="p-6 border-t border-slate-100 bg-white">
+              <div className="relative flex items-center">
+                <input 
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Type your question..."
+                  className="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium transition-all"
+                />
+                <button 
+                  type="submit"
+                  disabled={!chatInput.trim() || isChatLoading}
+                  className="absolute right-2 p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30"
+                >
+                  <Send size={20} />
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </main>
     </div>
   );
