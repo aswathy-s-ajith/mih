@@ -122,7 +122,7 @@ export default function AuthPage() {
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-12 cursor-pointer" onClick={() => navigate('/')}>
             <div className="w-8 h-8 bg-indigo-500 rounded-lg rotate-45" />
-            <span className="text-white font-bold text-xl tracking-tight">MeetingHub</span>
+            <span className="text-white font-bold text-xl tracking-tight">Meeting Intelligence Hub</span>
           </div>
           <h1 className="text-5xl font-bold text-white leading-tight">
             Turn meetings into <br />
@@ -133,12 +133,7 @@ export default function AuthPage() {
           </p>
         </div>
 
-        <div className="relative z-10 border-t border-slate-800 pt-8">
-          <p className="text-slate-500 text-sm italic">
-            "Meeting Intelligence Hub has saved our product team 10+ hours a week in documentation."
-          </p>
-          <p className="text-white font-medium mt-2">— Alex Rivera, Head of Product</p>
-        </div>
+        
 
         <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl" />
       </div>

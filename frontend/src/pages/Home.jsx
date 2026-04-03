@@ -21,7 +21,7 @@ const Navbar = () => (
       <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
         <div className="w-4 h-4 bg-white rounded-sm rotate-45" />
       </div>
-      <span className="font-bold text-xl tracking-tight text-slate-900">MeetingHub</span>
+      <span className="font-bold text-xl tracking-tight text-slate-900">Meeting Intelligence Hub</span>
     </div>
     <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
       <a href="#features" className="hover:text-indigo-600 transition-colors">Features</a>
@@ -63,13 +63,7 @@ export default function LandingPage() {
 
       {/* 1. Hero Section */}
       <header className="pt-20 pb-16 px-6 text-center max-w-4xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold mb-6 tracking-wide uppercase">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
-          </span>
-          v2.0 is now live
-        </div>
+        
         <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 mb-6">
           Stop Reading Meeting Transcripts. <span className="text-indigo-600">Start Using Them.</span>
         </h1>
@@ -80,9 +74,7 @@ export default function LandingPage() {
           <button className="w-full sm:w-auto px-8 py-4 bg-indigo-600 text-white rounded-full font-semibold text-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2">
             Get Started <ArrowRight className="w-5 h-5" />
           </button>
-          <button className="w-full sm:w-auto px-8 py-4 bg-white border border-slate-200 text-slate-700 rounded-full font-semibold text-lg hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
-            <Play className="w-4 h-4 fill-current" /> View Demo
-          </button>
+          
         </div>
       </header>
 
@@ -214,9 +206,7 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-            <div className="md:w-1/2 w-full h-80 bg-slate-100 rounded-3xl overflow-hidden shadow-inner border border-slate-200 flex items-center justify-center text-slate-400">
-               [Visual Placeholder: Team Collaboration Graphic]
-            </div>
+            
           </div>
         </div>
       </section>
@@ -229,7 +219,7 @@ export default function LandingPage() {
             Join 500+ forward-thinking teams turning talk into action. No credit card required.
           </p>
           <button className="px-10 py-5 bg-white text-indigo-600 rounded-full font-bold text-xl hover:bg-slate-50 transition-all shadow-xl">
-            Sign Up Free
+            <Link to='/auth'>Sign Up Free</Link>
           </button>
         </div>
       </section>

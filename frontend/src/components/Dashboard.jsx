@@ -45,9 +45,12 @@ export default function Dashboard() {
   // UI States
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [showDropZone, setShowDropZone] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
-  const [viewingTranscript, setViewingTranscript] = useState(null); // Added state for viewing file content
+  const [viewingTranscript, setViewingTranscript] = useState(null);
+
 
   // --- 2. Initialization ---
   useEffect(() => {
@@ -115,24 +118,62 @@ export default function Dashboard() {
       setShowProjectModal(false);
     } catch (error) { alert(error.message); }
   };
+  const handleDeleteTranscript = async (transcriptId) => {
+  if (!window.confirm("Are you sure you want to delete this transcript?")) return;
 
+  try {
+    const { error } = await supabase
+      .from('transcripts')
+      .delete()
+      .eq('id', transcriptId);
+
+    if (error) throw error;
+
+    // Refresh data after deletion
+    await fetchDashboardData();
+    alert("Transcript deleted successfully");
+  } catch (error) {
+    alert("Error deleting: " + error.message);
+  }
+};
+  // SECURED UPLOAD LOGIC
   const handleFileSelect = async (event) => {
-    const file = event.target.files[0];
-    if (!file || !selectedProjectId) return;
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0 || !selectedProjectId) return;
+
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('project_id', selectedProjectId);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert("Session expired. Please login again.");
+        return navigate('/login');
+      }
 
-      const response = await fetch('http://localhost:8000/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!response.ok) throw new Error('Backend processing failed');
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('project_id', selectedProjectId);
+
+        const response = await fetch('http://localhost:8000/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Backend processing failed');
+        }
+      }
+
       await fetchDashboardData();
-    } catch (error) { alert(error.message); }
-    finally { 
+      setShowDropZone(false);
+      alert('AI Analysis Complete!');
+    } catch (error) { 
+      alert(error.message); 
+    } finally { 
       setIsUploading(false); 
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
@@ -141,6 +182,25 @@ export default function Dashboard() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length > 0) {
+      const event = { target: { files } };
+      handleFileSelect(event);
+    }
   };
 
   // --- 5. Filtering Logic for Project View ---
@@ -162,7 +222,7 @@ export default function Dashboard() {
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-200">
             <div className="w-4 h-4 bg-white rounded-sm rotate-45" />
           </div>
-          <span className="font-bold text-lg tracking-tight">MeetingHub</span>
+          <span className="font-bold text-lg tracking-tight">Meeting Intelligence Hub</span>
         </div>
 
         <nav className="flex-1 space-y-1">
@@ -178,7 +238,7 @@ export default function Dashboard() {
             </div>
             <div className="flex-1 overflow-hidden">
               <p className="font-bold truncate text-slate-900">{userDisplayName}</p>
-              <p className="text-[10px] text-slate-400 truncate uppercase tracking-widest font-bold">Pro Account</p>
+              <p className="text-xs text-slate-500 truncate">{user?.email}</p>
             </div>
           </div>
           <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all">
@@ -212,7 +272,6 @@ export default function Dashboard() {
         <div className="flex-1 overflow-y-auto p-8 space-y-8 max-w-7xl mx-auto w-full print:p-0">
           
           {!selectedProjectId ? (
-            /* --- VIEW 1: GLOBAL DASHBOARD --- */
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard label="Total Projects" value={loading ? "..." : projects.length} icon={FolderRoot} trend="Active" />
@@ -254,16 +313,15 @@ export default function Dashboard() {
               </div>
             </>
           ) : (
-            /* --- VIEW 2: PROJECT DETAIL VIEW --- */
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
               <div className="flex justify-between items-center print:hidden">
                 <div>
                   <h2 className="text-3xl font-bold text-slate-900">{activeProject.name}</h2>
                   <p className="text-slate-500 text-sm mt-1">Accepting .TXT and .VTT transcript formats.</p>
                 </div>
-                <div className="flex gap-2">
-                  <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".txt,.vtt" className="hidden" />
-                  <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 disabled:opacity-50 shadow-lg shadow-slate-200 transition-all">
+                <div className="flex items-center gap-3">
+                  <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".txt,.vtt" multiple className="hidden" />
+                  <button onClick={() => setShowDropZone(prev => !prev)} disabled={isUploading} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 disabled:opacity-50 transition-all">
                     {isUploading ? <Loader2 className="animate-spin" size={18} /> : <FileUp size={18} />}
                     {isUploading ? "Extracting..." : "Upload Transcript"}
                   </button>
@@ -276,14 +334,58 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Print Header */}
+              {showDropZone && (
+                <div 
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`relative group cursor-pointer border-2 border-dashed rounded-3xl p-12 transition-all duration-300 flex flex-col items-center justify-center gap-4 ${
+                    isDragging 
+                      ? 'border-indigo-600 bg-indigo-50/50 scale-[1.01]' 
+                      : 'border-slate-200 bg-white hover:border-indigo-400 hover:bg-slate-50/50'
+                  }`}>
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all ${
+                    isDragging ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:text-indigo-500 group-hover:bg-indigo-50'
+                  }`}>
+                    {isUploading ? (
+                      <Loader2 className="w-8 h-8 animate-spin" />
+                    ) : (
+                      <FileUp className="w-8 h-8" />
+                    )}
+                  </div>
+
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-slate-900">
+                      {isUploading ? "AI is analyzing your meeting..." : "Drop your transcript here"}
+                    </p>
+                    <p className="text-sm text-slate-500 mt-1">
+                      or click to browse from your computer
+                    </p>
+                  </div>
+
+                  <div className="flex gap-4 mt-2">
+                    <span className="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-bold text-slate-500 uppercase tracking-widest">.txt</span>
+                    <span className="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-bold text-slate-500 uppercase tracking-widest">.vtt</span>
+                  </div>
+
+                  {isUploading && (
+                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] rounded-3xl flex items-center justify-center z-10">
+                      <div className="flex flex-col items-center gap-3">
+                        <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+                        <span className="font-bold text-indigo-600 animate-pulse">Extracting Insights...</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="hidden print:block border-b-2 border-slate-200 pb-4 mb-6">
                 <h1 className="text-2xl font-bold">{activeProject.name} - Meeting Insights</h1>
                 <p className="text-slate-500 text-sm">Generated on {new Date().toLocaleDateString()}</p>
               </div>
 
               <div className="grid grid-cols-1 gap-8">
-                {/* DECISIONS SECTION */}
                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                   <div className="px-6 py-4 border-b border-slate-100 font-bold text-sm bg-slate-50/50">Decisions (Final Agreements)</div>
                   <div className="p-6 space-y-3">
@@ -299,7 +401,6 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* ACTION ITEMS TABLE (WHO, WHAT, BY WHEN) */}
                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                   <div className="px-6 py-4 border-b border-slate-100 font-bold text-sm bg-slate-50/50 text-orange-600">Action Items (Tasks)</div>
                   <table className="w-full text-left">
@@ -320,16 +421,10 @@ export default function Dashboard() {
                           <td className="px-6 py-4 text-slate-500 font-mono italic">{d.due_date || 'TBD'}</td>
                         </tr>
                       ))}
-                      {projectDecisions.filter(d => d.type === 'action_item').length === 0 && (
-                        <tr>
-                          <td colSpan="3" className="px-6 py-10 text-center text-slate-400 italic">No action items extracted yet.</td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
 
-                {/* PROJECT TRANSCRIPTS LIST */}
                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm print:hidden">
                   <div className="px-6 py-4 border-b border-slate-100 font-bold text-sm bg-slate-50/50 flex items-center gap-2">
                     <FileText size={16} className="text-slate-500" /> Transcripts in this Project
@@ -337,26 +432,33 @@ export default function Dashboard() {
                   <div className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {projectTranscripts.map(t => (
-                        <div key={t.id} className="flex items-center justify-between p-4 border rounded-xl bg-slate-50/50">
+                        <div key={t.id} className="flex items-center justify-between p-4 border rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors">
                           <div className="flex items-center gap-3">
                             <FileText size={18} className="text-slate-400" />
                             <div>
                               <p className="text-sm font-bold">{t.filename}</p>
-                              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">{t.word_count} Words • {formatDate(t.created_at)}</p>
+                              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">
+                                {t.word_count} Words • {formatDate(t.created_at)}
+                              </p>
                             </div>
                           </div>
-                          {/* FIXED BUTTON: Click will now trigger the modal below */}
-                          <button 
-                            onClick={() => setViewingTranscript(t)}
-                            className="text-indigo-600 hover:text-indigo-800 font-bold text-xs transition-colors"
-                          >
-                            View File
-                          </button>
+                          <div className="flex gap-3">
+                            <button 
+                              onClick={() => setViewingTranscript(t)} 
+                              className="text-indigo-600 hover:text-indigo-800 font-bold text-xs"
+                            >
+                              View File
+                            </button>
+                            {/* ADD THIS DELETE BUTTON */}
+                            <button 
+                              onClick={() => handleDeleteTranscript(t.id)} 
+                              className="text-red-500 hover:text-red-700 font-bold text-xs"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
                       ))}
-                      {projectTranscripts.length === 0 && (
-                        <p className="col-span-2 text-center text-slate-400 text-sm italic py-4">No transcripts uploaded to this project.</p>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -365,30 +467,28 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* MODAL: VIEW TRANSCRIPT CONTENT (FIXED FEATURE) */}
         {viewingTranscript && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl w-full max-w-4xl p-8 shadow-2xl animate-in zoom-in duration-300 max-h-[85vh] flex flex-col">
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h3 className="text-xl font-bold">{viewingTranscript.filename}</h3>
-                  <p className="text-xs text-slate-400 uppercase font-bold tracking-widest mt-1">Transcript Content</p>
+                  <p className="text-xs text-slate-400 uppercase font-bold tracking-widest mt-1">Full Transcript Text</p>
                 </div>
                 <button onClick={() => setViewingTranscript(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24}/></button>
               </div>
               <div className="flex-1 overflow-y-auto bg-slate-50 p-6 rounded-2xl border border-slate-200">
                 <pre className="text-sm text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">
-                  {viewingTranscript.content || "This transcript has no content saved."}
+                  {viewingTranscript.content || "No content found for this transcript."}
                 </pre>
               </div>
               <div className="mt-6 flex justify-end">
-                <button onClick={() => setViewingTranscript(null)} className="bg-slate-900 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-slate-800 transition-all">Close Viewer</button>
+                <button onClick={() => setViewingTranscript(null)} className="bg-slate-900 text-white px-8 py-2.5 rounded-xl font-bold hover:bg-slate-800 transition-all text-sm">Close Reader</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* MODAL: NEW PROJECT */}
         {showProjectModal && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-300">
