@@ -61,6 +61,8 @@ class ChatResponse(BaseModel):
     sources: List[dict]
     intent: str = "rag_search"
 
+
+
 # ─────────────────────────────────────────────
 # 5. Auth Dependency
 # ─────────────────────────────────────────────
@@ -178,6 +180,208 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 150) -> List[str
         if chunk:
             chunks.append(chunk)
     return chunks
+
+
+from transformers import pipeline
+
+# Add this right after your embed_model line
+emotion_model = pipeline(
+    "text-classification",
+    model="j-hartmann/emotion-english-distilroberta-base",
+    top_k=None,  # returns ALL emotion scores, not just top 1
+    device=-1    # CPU — change to 0 if you have a GPU
+)
+# ─────────────────────────────────────────────
+# SENTIMENT ANALYSIS — Speaker + Segment Level
+# ─────────────────────────────────────────────
+
+EMOTION_TO_SENTIMENT = {
+    "joy":      {"sentiment": "positive", "label": "Enthusiastic", "color": "#22c55e"},
+    "surprise": {"sentiment": "positive", "label": "Engaged",      "color": "#84cc16"},
+    "neutral":  {"sentiment": "neutral",  "label": "Neutral",      "color": "#94a3b8"},
+    "fear":     {"sentiment": "negative", "label": "Concerned",    "color": "#f59e0b"},
+    "sadness":  {"sentiment": "negative", "label": "Uncertain",    "color": "#f97316"},
+    "anger":    {"sentiment": "negative", "label": "Frustrated",   "color": "#ef4444"},
+    "disgust":  {"sentiment": "negative", "label": "Conflicted",   "color": "#dc2626"},
+}
+
+def parse_speakers(content: str) -> list[dict]:
+    """
+    Parse transcript into speaker turns.
+    Handles formats:
+      - "Speaker Name: dialogue text"
+      - "SPEAKER_00: dialogue text"
+    Groups consecutive turns by same speaker into segments of 3 turns each.
+    """
+    lines = content.strip().split('\n')
+    turns = []
+    current_speaker = "Unknown"
+    current_text = []
+
+    speaker_pattern = re.compile(r'^([A-Z][A-Za-z\s]+|SPEAKER_\d+)\s*:\s*(.+)')
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        match = speaker_pattern.match(line)
+        if match:
+            # Save previous turn
+            if current_text:
+                turns.append({
+                    "speaker": current_speaker,
+                    "text": " ".join(current_text).strip()
+                })
+            current_speaker = match.group(1).strip()
+            current_text = [match.group(2).strip()]
+        else:
+            current_text.append(line)
+
+    # Save last turn
+    if current_text:
+        turns.append({
+            "speaker": current_speaker,
+            "text": " ".join(current_text).strip()
+        })
+
+    return turns
+
+
+def group_turns_into_segments(turns: list[dict], turns_per_segment: int = 3) -> list[dict]:
+    """
+    Groups every N speaker turns into one segment.
+    Each segment has a combined text and a dominant speaker.
+    """
+    segments = []
+    for i in range(0, len(turns), turns_per_segment):
+        group = turns[i: i + turns_per_segment]
+        combined_text = " ".join([t["text"] for t in group])
+        # Dominant speaker = whoever spoke most in this group
+        speaker_counts = {}
+        for t in group:
+            speaker_counts[t["speaker"]] = speaker_counts.get(t["speaker"], 0) + len(t["text"].split())
+        dominant_speaker = max(speaker_counts, key=speaker_counts.get)
+        segments.append({
+            "segment_index": len(segments),
+            "speaker": dominant_speaker,
+            "text": combined_text,
+            "speakers_in_segment": list(speaker_counts.keys())
+        })
+    return segments
+
+
+def analyze_emotion(text: str) -> dict:
+    """
+    Run the j-hartmann emotion model on a piece of text.
+    Returns the dominant emotion + its mapped sentiment/label/color + raw score.
+    Truncates to 512 tokens (model limit).
+    """
+    truncated = " ".join(text.split()[:400])  # safe truncation before tokenization
+    try:
+        results = emotion_model(truncated)[0]  # list of {label, score} for all 7 emotions
+        # Sort by score, pick the top emotion
+        top_emotion = max(results, key=lambda x: x["score"])
+        emotion_name = top_emotion["label"].lower()
+        score = top_emotion["score"]
+
+        mapping = EMOTION_TO_SENTIMENT.get(emotion_name, {
+            "sentiment": "neutral",
+            "label": "Neutral",
+            "color": "#94a3b8"
+        })
+
+        # Normalize score to -1.0 → +1.0 for charting
+        if mapping["sentiment"] == "positive":
+            normalized_score = score
+        elif mapping["sentiment"] == "negative":
+            normalized_score = -score
+        else:
+            normalized_score = 0.0
+
+        return {
+            "emotion": emotion_name,
+            "label": mapping["label"],
+            "sentiment": mapping["sentiment"],
+            "color": mapping["color"],
+            "score": round(normalized_score, 3),
+            "confidence": round(score, 3),
+            "all_emotions": {r["label"].lower(): round(r["score"], 3) for r in results}
+        }
+    except Exception as e:
+        print(f"Emotion analysis error: {e}")
+        return {
+            "emotion": "neutral",
+            "label": "Neutral",
+            "sentiment": "neutral",
+            "color": "#94a3b8",
+            "score": 0.0,
+            "confidence": 0.0,
+            "all_emotions": {}
+        }
+
+
+def compute_speaker_breakdown(analyzed_segments: list[dict]) -> list[dict]:
+    """
+    Aggregate sentiment scores per speaker.
+    Returns list of speakers with avg score, dominant label, pos/neg/neutral counts.
+    """
+    speaker_data = {}
+
+    for seg in analyzed_segments:
+        speaker = seg["speaker"]
+        if speaker not in speaker_data:
+            speaker_data[speaker] = {
+                "scores": [],
+                "labels": [],
+                "positive": 0,
+                "neutral": 0,
+                "negative": 0
+            }
+        speaker_data[speaker]["scores"].append(seg["score"])
+        speaker_data[speaker]["labels"].append(seg["label"])
+        speaker_data[speaker][seg["sentiment"]] += 1
+
+    breakdown = []
+    for speaker, data in speaker_data.items():
+        scores = data["scores"]
+        avg_score = round(sum(scores) / len(scores), 3)
+        dominant_label = max(set(data["labels"]), key=data["labels"].count)
+
+        # Map avg score to a 0-100 vibe score for the UI
+        vibe_score = round((avg_score + 1) / 2 * 100)
+
+        breakdown.append({
+            "speaker": speaker,
+            "avg_score": avg_score,
+            "vibe_score": vibe_score,
+            "dominant_label": dominant_label,
+            "positive_count": data["positive"],
+            "neutral_count": data["neutral"],
+            "negative_count": data["negative"],
+            "total_segments": len(scores)
+        })
+
+    # Sort by vibe score descending (most positive speaker first)
+    breakdown.sort(key=lambda x: x["vibe_score"], reverse=True)
+    return breakdown
+
+
+def compute_overall_vibe(analyzed_segments: list[dict]) -> dict:
+    """
+    Single meeting-level vibe score + label for the score card.
+    """
+    if not analyzed_segments:
+        return {"vibe_score": 50, "label": "No Data", "color": "#94a3b8", "emoji": "⚪"}
+
+    avg = sum(s["score"] for s in analyzed_segments) / len(analyzed_segments)
+    vibe_score = round((avg + 1) / 2 * 100)  # map -1..1 to 0..100
+
+    if vibe_score >= 65:
+        return {"vibe_score": vibe_score, "label": "Collaborative", "color": "#22c55e", "emoji": "🟢"}
+    elif vibe_score >= 40:
+        return {"vibe_score": vibe_score, "label": "Mixed", "color": "#f59e0b", "emoji": "🟡"}
+    else:
+        return {"vibe_score": vibe_score, "label": "Tense", "color": "#ef4444", "emoji": "🔴"}
 
 # ─────────────────────────────────────────────
 # 9. Hybrid Search (Vector + Keyword fallback)
@@ -658,3 +862,103 @@ async def chat_with_transcripts(
     except Exception as e:
         print(f"Chat Error: {str(e)}")
         raise HTTPException(status_code=500, detail="The assistant encountered an error.")
+    
+
+@app.get("/sentiment/{transcript_id}")
+async def get_sentiment(
+    transcript_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Returns full sentiment analysis for a transcript.
+    Checks DB first — only runs the model if not already analyzed.
+    """
+    try:
+        # 1. Check if already analyzed (avoid re-running the model)
+        existing = (
+            supabase.table("sentiment_segments")
+            .select("*")
+            .eq("transcript_id", int(transcript_id))
+            .execute()
+        )
+
+        if existing.data:
+            # Already analyzed — return from DB
+            segments = existing.data
+            overall = compute_overall_vibe(segments)
+            speakers = compute_speaker_breakdown(segments)
+            return {
+                "transcript_id": transcript_id,
+                "overall": overall,
+                "segments": segments,
+                "speakers": speakers,
+                "cached": True
+            }
+
+        # 2. Fetch transcript content
+        transcript = (
+            supabase.table("transcripts")
+            .select("content, filename")
+            .eq("id", int(transcript_id))
+            .single()
+            .execute()
+        )
+
+        if not transcript.data:
+            raise HTTPException(status_code=404, detail="Transcript not found")
+
+        content = transcript.data["content"]
+
+        # 3. Parse into speaker turns → group into segments
+        turns = parse_speakers(content)
+        has_speakers = any(t["speaker"] != "Unknown" for t in turns)
+
+        if not turns:
+            raise HTTPException(status_code=400, detail="Could not parse transcript content")
+
+        raw_segments = group_turns_into_segments(turns, turns_per_segment=3)
+
+        # 4. Run emotion model on each segment
+        analyzed_segments = []
+        to_insert = []
+
+        for seg in raw_segments:
+            emotion_result = analyze_emotion(seg["text"])
+
+            analyzed_seg = {
+                "transcript_id": int(transcript_id),
+                "segment_index": seg["segment_index"],
+                "speaker": seg["speaker"],
+                "text": seg["text"],
+                "sentiment": emotion_result["sentiment"],
+                "label": emotion_result["label"],
+                "score": emotion_result["score"],
+                "color": emotion_result["color"],
+                "emotion": emotion_result["emotion"],
+                "confidence": emotion_result["confidence"],
+            }
+            analyzed_segments.append(analyzed_seg)
+            to_insert.append(analyzed_seg)
+
+        # 5. Store in DB
+        if to_insert:
+            supabase.table("sentiment_segments").insert(to_insert).execute()
+
+        # 6. Compute aggregates
+        overall = compute_overall_vibe(analyzed_segments)
+        speakers = compute_speaker_breakdown(analyzed_segments)
+
+        return {
+            "transcript_id": transcript_id,
+            "overall": overall,
+            "segments": analyzed_segments,
+            "speakers": speakers,
+            "has_speakers": has_speakers,
+            "cached": False
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Sentiment error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
