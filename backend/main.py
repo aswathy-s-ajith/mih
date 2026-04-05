@@ -167,9 +167,15 @@ def classify_intent(message: str) -> str:
 # ─────────────────────────────────────────────
 # 8. Embedding & Chunking
 # ─────────────────────────────────────────────
-def generate_embeddings(text_list: List[str]) -> List[List[float]]:
-    embeddings = embed_model.encode(text_list)
-    return embeddings.tolist()
+# Replace your current generate_embeddings with this:
+import requests
+HF_TOKEN = os.getenv("HF_TOKEN") # Get a free token from huggingface.co
+API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2"
+
+def generate_embeddings(text_list):
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    response = requests.post(API_URL, headers=headers, json={"inputs": text_list})
+    return response.json()
 
 def chunk_text(text: str, chunk_size: int = 500, overlap: int = 150) -> List[str]:
     words = text.split()
