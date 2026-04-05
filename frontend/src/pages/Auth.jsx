@@ -8,7 +8,7 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
-import { supabase } from "../lib/supabase";
+import { supabase } from "../lib/supabase.js";
 import { useNavigate } from 'react-router-dom';
 
 export default function AuthPage() {

@@ -5,7 +5,7 @@ import {
   CheckCircle2, Send, FileUp, Loader2, X, Check, ChevronRight, Download, FileType,
   Sparkles
 } from 'lucide-react';
-import { supabase } from "../lib/supabase";
+import { supabase } from "../lib/supabase.js";
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
