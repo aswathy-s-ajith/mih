@@ -2,6 +2,7 @@ import os
 import json
 import re
 import requests
+import time
 from typing import List
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,9 +11,7 @@ from groq import Groq
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
-# ─────────────────────────────────────────────
 # 1. Environment & Clients
-# ─────────────────────────────────────────────
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -21,24 +20,24 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 if not all([SUPABASE_URL, SUPABASE_KEY, GROQ_API_KEY, HF_TOKEN]):
-    raise RuntimeError("Missing required environment variables in .env")
+    raise RuntimeError("Missing required environment variables in Render/Vercel settings")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-# ─────────────────────────────────────────────
-# 2. Models & Setup
-# ─────────────────────────────────────────────
+# 2. App Setup
 app = FastAPI(title="Meeting Intelligence API")
 
+# Updated CORS for Cloud Deployment
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:3000","https://mih-s2cu-o1kb0sjuw-ash-b81e34bf.vercel.app","https://mih-s2cu.vercel.app"],
-    allow_credentials=True,
+    allow_origins=["*"],  # Allows all Vercel preview & production URLs
+    allow_credentials=False, # Required when using allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# 3. Pydantic Models
 class UploadResponse(BaseModel):
     success: bool
     transcript_id: int
@@ -53,9 +52,7 @@ class ChatResponse(BaseModel):
     sources: List[dict]
     intent: str = "rag_search"
 
-# ─────────────────────────────────────────────
-# 3. Auth Dependency
-# ─────────────────────────────────────────────
+# 4. Auth Dependency
 def get_current_user(authorization: str = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="No authorization header provided")
@@ -68,9 +65,7 @@ def get_current_user(authorization: str = Header(None)):
     except Exception:
         raise HTTPException(status_code=401, detail="Unauthorized access")
 
-# ─────────────────────────────────────────────
-# 4. System Prompts
-# ─────────────────────────────────────────────
+# 5. System Prompts
 RAG_SYSTEM_PROMPT = """You are Recall, an assistant. Answer using ONLY provided transcript excerpts. 
 Cite sources as [Source: snippet]. If not found, say you couldn't find it. Tone: Helpful, direct."""
 
@@ -78,20 +73,36 @@ SUMMARY_SYSTEM_PROMPT = """Summarize transcript excerpts into: Overview, Key Dec
 
 INTENT_CLASSIFIER_PROMPT = """Classify message into exactly one: "greeting", "summary", "action_items", "sentiment", "rag_search". Return ONLY JSON: {{"intent": "..."}}"""
 
-# ─────────────────────────────────────────────
-# 5. Core AI Functions (API Based)
-# ─────────────────────────────────────────────
+# 6. Core AI Functions (Cloud-Safe API Based)
 def generate_embeddings(text_list: List[str]) -> List[List[float]]:
     API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2"
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     response = requests.post(API_URL, headers=headers, json={"inputs": text_list})
     
-    if response.status_code == 503: # Model loading
-        import time
+    if response.status_code == 503: # Model loading on HF side
         time.sleep(10)
         response = requests.post(API_URL, headers=headers, json={"inputs": text_list})
     
     return response.json()
+
+def analyze_sentiment_api(text: str):
+    # Using a fast, lightweight sentiment model from HF API
+    API_URL = "https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english"
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    # Analyze first 500 chars to avoid payload limits
+    response = requests.post(API_URL, headers=headers, json={"inputs": text[:500]})
+    
+    if response.status_code == 200:
+        res = response.json()[0]
+        top = max(res, key=lambda x: x['score'])
+        sentiment = top['label'].lower()
+        return {
+            "sentiment": "positive" if "pos" in sentiment else "negative",
+            "label": "Positive" if "pos" in sentiment else "Negative",
+            "score": top['score'] if "pos" in sentiment else -top['score'],
+            "color": "#22c55e" if "pos" in sentiment else "#ef4444"
+        }
+    return {"sentiment": "neutral", "label": "Neutral", "score": 0, "color": "#94a3b8"}
 
 def classify_intent(message: str) -> str:
     try:
@@ -114,9 +125,7 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 150) -> List[str
         if chunk: chunks.append(chunk)
     return chunks
 
-# ─────────────────────────────────────────────
-# 6. RAG / Search Logic
-# ─────────────────────────────────────────────
+# 7. RAG / Search Logic
 def hybrid_search(query: str, project_id: int) -> List[dict]:
     try:
         query_vector = generate_embeddings([query])[0]
@@ -130,9 +139,7 @@ def hybrid_search(query: str, project_id: int) -> List[dict]:
     except Exception:
         return []
 
-# ─────────────────────────────────────────────
-# 7. Route Handlers
-# ─────────────────────────────────────────────
+# 8. Route Handlers
 def handle_greeting() -> ChatResponse:
     return ChatResponse(answer="Hey! I'm Recall. How can I help with your meetings?", sources=[], intent="greeting")
 
@@ -157,16 +164,16 @@ def handle_rag_search(question: str, project_id: int) -> ChatResponse:
     )
     return ChatResponse(answer=response.choices[0].message.content, sources=[{"transcript_id": c["transcript_id"]} for c in chunks], intent="rag_search")
 
-# ─────────────────────────────────────────────
-# 8. Routes
-# ─────────────────────────────────────────────
+# 9. Main Routes
+@app.get("/health")
+def health(): return {"status": "ok"}
+
 @app.post("/upload", response_model=UploadResponse)
 async def upload_transcript(file: UploadFile = File(...), project_id: str = Form(default="1"), current_user: dict = Depends(get_current_user)):
     content = (await file.read()).decode("utf-8")
     res = supabase.table("transcripts").insert({"project_id": int(project_id), "filename": file.filename, "content": content, "word_count": len(content.split())}).execute()
     t_id = res.data[0]["id"]
     
-    # Process RAG
     chunks = chunk_text(content)
     embeddings = generate_embeddings(chunks)
     to_insert = [{"transcript_id": t_id, "project_id": int(project_id), "content": c, "embedding": e} for c, e in zip(chunks, embeddings)]
@@ -181,5 +188,23 @@ async def chat(req: ChatRequest, current_user: dict = Depends(get_current_user))
     if intent == "summary": return handle_summary(req.project_id)
     return handle_rag_search(req.question, req.project_id)
 
-@app.get("/health")
-def health(): return {"status": "ok"}
+@app.get("/sentiment/{transcript_id}")
+async def get_sentiment(transcript_id: int, current_user: dict = Depends(get_current_user)):
+    res = supabase.table("transcripts").select("content").eq("id", transcript_id).single().execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Transcript not found")
+    
+    content = res.data["content"]
+    analysis = analyze_sentiment_api(content)
+    
+    return {
+        "transcript_id": transcript_id,
+        "overall": {
+            "vibe_score": int((analysis["score"] + 1) / 2 * 100),
+            "label": analysis["label"],
+            "color": analysis["color"],
+            "emoji": "🟢" if analysis["sentiment"] == "positive" else "🔴"
+        },
+        "segments": [],
+        "speakers": []
+    }
