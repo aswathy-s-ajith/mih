@@ -33,7 +33,7 @@ app = FastAPI(title="Meeting Intelligence API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:3000","https://mih-s2cu-o1kb0sjuw-ash-b81e34bf.vercel.app"],
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:3000","https://mih-s2cu-o1kb0sjuw-ash-b81e34bf.vercel.app","https://mih-s2cu.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
