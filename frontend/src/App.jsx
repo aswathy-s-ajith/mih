@@ -10,7 +10,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/auth" element={<Auth />} />
+        <Route path="/auth/login" element={<Auth />} />
+        <Route path="/auth/signup" element={<Auth />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/upload" element={<Upload />} />
         <Route path="/meeting/:id" element={<MeetingDetail />} />

@@ -12,27 +12,27 @@ import {
 import { Link } from 'react-router-dom';
 
 // ── Rings Background ──────────────────────────────────────────────
-const RingsBackground = () => (
-  <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
-    {[100, 200, 310, 430, 560, 700, 860].map((size, i) => (
-      <div
-        key={i}
-        className="absolute rounded-full border border-indigo-500/[0.08]"
-        style={{
-          width: size,
-          height: size,
-          animation: `ringPulse 5s ease-in-out infinite`,
-          animationDelay: `${-i * 0.7}s`,
-        }}
-      />
-    ))}
-    <div
-      className="absolute inset-0"
-      style={{
-        background:
-          'radial-gradient(ellipse 60% 60% at 50% 50%, transparent 20%, #ffffff 72%)',
-      }}
+const MotionBackground = () => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
+    {/* Animated Gradient Orbs */}
+    <div 
+      className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-50/50 rounded-full blur-[120px] animate-blob" 
     />
+    <div 
+      className="absolute bottom-[10%] right-[-5%] w-[35%] h-[35%] bg-blue-50/50 rounded-full blur-[100px] animate-blob animation-delay-2000" 
+    />
+    <div 
+      className="absolute top-[20%] right-[10%] w-[30%] h-[30%] bg-slate-50/60 rounded-full blur-[80px] animate-blob animation-delay-4000" 
+    />
+
+    {/* Subtle Grid overlay for that "SaaS" look */}
+    <div 
+      className="absolute inset-0 opacity-[0.03]" 
+      style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '32px 32px' }}
+    />
+    
+    {/* Fade out the bottom so it doesn't clash with the dashboard section */}
+    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white" />
   </div>
 );
 
@@ -252,10 +252,10 @@ const Navbar = () => (
       
     </div>
     <div className="flex items-center gap-6">
-      <Link to="/auth" className="text-sm font-medium text-[#71717A] hover:text-[#18181B] transition-colors duration-200">
+      <Link to="/auth/login" className="text-sm font-medium text-[#71717A] hover:text-[#18181B] transition-colors duration-200">
         Log in
       </Link>
-      <Link to="/auth" className="bg-[#18181B] text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-[#27272A] transition-all">
+      <Link to="/auth/signup" className="bg-[#18181B] text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-[#27272A] transition-all">
         Sign Up
       </Link>
     </div>
@@ -310,6 +310,21 @@ export default function LandingPage() {
           0%   { opacity: 0; transform: translateY(20px); }
           100% { opacity: 1; transform: translateY(0);    }
         }
+        @keyframes blob {
+          0%   { transform: translate(0px, 0px) scale(1); }
+          33%  { transform: translate(30px, -50px) scale(1.1); }
+          66%  { transform: translate(-20px, 20px) scale(0.9); }
+          100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .animate-blob {
+          animation: blob 12s infinite alternate ease-in-out;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
       `}</style>
 
       <Navbar />
@@ -318,7 +333,7 @@ export default function LandingPage() {
       <header className="relative pt-24 pb-20 px-6 text-center max-w-5xl mx-auto overflow-hidden" style={{ minHeight: '520px' }}>
 
         {/* Background layer */}
-        {BG === 'rings'     && <RingsBackground />}
+        {BG === 'rings'     && <MotionBackground />}
         {BG === 'particles' && <ParticlesBackground />}
         {BG === 'aurora'    && <AuroraBackground />}
         {BG === 'grid'      && <GridOrbsBackground />}
