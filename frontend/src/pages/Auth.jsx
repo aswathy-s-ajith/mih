@@ -43,6 +43,20 @@ export default function AuthPage() {
 
   const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
+  const handleGoogleLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+      if (error) throw error;
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -87,11 +101,11 @@ export default function AuthPage() {
     );
   }
 
-return (
+  return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="h-screen w-full bg-white flex flex-row overflow-hidden fixed inset-0" // Added h-screen, overflow-hidden, and fixed inset-0
+      className="fixed inset-0 h-screen w-full bg-white flex flex-row overflow-hidden" 
     >
       <style>{`
         @keyframes blob {
@@ -103,7 +117,7 @@ return (
         .animation-delay-2000 { animation-delay: 2s; }
       `}</style>
 
-      {/* ── LEFT SIDE: DARK ── */}
+      {/* ── LEFT SIDE ── */}
       <div className="hidden lg:flex lg:w-1/2 bg-[#0F172A] p-12 flex-col justify-between relative overflow-hidden shrink-0 h-full">
         <MotionBackground />
         <div className="relative z-10">
@@ -123,8 +137,8 @@ return (
         </div>
       </div>
 
-      {/* ── RIGHT SIDE: FORM ── */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 bg-slate-50 relative h-full overflow-y-auto"> {/* Added overflow-y-auto here for small screens */}
+      {/* ── RIGHT SIDE ── */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 bg-slate-50 relative h-full overflow-y-auto">
         <AnimatePresence mode="wait">
           <motion.div 
             key={isLogin ? 'login' : 'signup'}
@@ -132,7 +146,7 @@ return (
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -15 }}
             transition={{ duration: 0.2 }}
-            className="w-full max-w-[360px] my-auto" // Added my-auto
+            className="w-full max-w-[360px] my-auto"
           >
             <div className="bg-white rounded-[2rem] shadow-2xl shadow-slate-200/50 border border-slate-100 p-7 md:p-8">
               <div className="mb-6 text-center lg:text-left">
@@ -144,12 +158,12 @@ return (
                 </p>
               </div>
 
-              <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })} className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-slate-700 text-[13px] font-semibold hover:bg-slate-50 transition-all active:scale-[0.98] mb-6 shadow-sm">
+              <button onClick={handleGoogleLogin} className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-slate-700 text-[13px] font-semibold hover:bg-slate-50 transition-all active:scale-[0.98] mb-6 shadow-sm">
                 <img src="https://www.svgrepo.com/show/355037/google.svg" className="w-4 h-4" alt="G" />
                 Continue with Google
               </button>
 
-              <div className="relative mb-6 text-center">
+              <div className="relative mb-4 text-center">
                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
                 <span className="relative bg-white px-2 text-[10px] text-slate-400 uppercase font-bold tracking-widest">Or</span>
               </div>
@@ -173,10 +187,17 @@ return (
                 )}
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 ml-1">Email</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 ml-1">Email address</label>
                   <div className="relative group">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-indigo-500" />
-                    <input type="email" name="email" required placeholder="name@work.com" className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-400 focus:bg-white outline-none transition-all" onChange={handleInputChange} />
+                    <input 
+                      type="email" 
+                      name="email" // <--- ADDED NAME ATTRIBUTE
+                      required 
+                      placeholder="name@work.com" 
+                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-400 focus:bg-white outline-none transition-all" 
+                      onChange={handleInputChange} 
+                    />
                   </div>
                 </div>
 
@@ -189,7 +210,9 @@ return (
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-indigo-500" />
                     <input 
                       type={showPassword ? "text" : "password"} 
-                      name="password" required placeholder="••••••••" 
+                      name="password" // <--- ADDED NAME ATTRIBUTE
+                      required 
+                      placeholder="••••••••" 
                       className="w-full pl-9 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-400 focus:bg-white outline-none transition-all" 
                       onChange={handleInputChange} 
                     />
@@ -206,13 +229,15 @@ return (
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-indigo-500" />
                       <input 
                         type={showPassword ? "text" : "password"} 
-                        name="confirmPassword" required placeholder="••••••••" 
+                        name="confirmPassword" // <--- ADDED NAME ATTRIBUTE
+                        required 
+                        placeholder="••••••••" 
                         className="w-full pl-9 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-400 focus:bg-white outline-none transition-all" 
                         onChange={handleInputChange} 
                       />
-                       <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-all">
-                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-all">
+                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
                     </div>
                   </div>
                 )}
@@ -236,5 +261,4 @@ return (
       </div>
     </motion.div>
   );
-
 }

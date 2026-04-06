@@ -12,7 +12,8 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell
 } from 'recharts';
-
+import { Calendar as CalendarIcon } from 'lucide-react';
+import ActionCalendar from './ActionCalendar'; // Adjust path if necessary
 const API = import.meta.env.VITE_API_URL || 'https://mih-1.onrender.com';
 
 // ─────────────────────────────────────────────
@@ -452,6 +453,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const chatBottomRef = useRef(null);
+  
 
   // --- State ---
   const [user, setUser] = useState(null);
@@ -490,7 +492,7 @@ export default function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return navigate('/login');
       setUser(user);
-      await fetchDashboardData();
+      await fetchDashboardData(user.id);
     };
     initDashboard();
   }, [navigate]);
@@ -500,17 +502,52 @@ export default function Dashboard() {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, isChatLoading]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (userId) => {
     try {
       setLoading(true);
-      const [projRes, transRes, decRes] = await Promise.all([
-        supabase.from('projects').select('*').order('created_at', { ascending: false }),
-        supabase.from('transcripts').select('*').order('created_at', { ascending: false }),
-        supabase.from('decisions').select('*').order('created_at', { ascending: false }),
-      ]);
-      if (projRes.data) setProjects(projRes.data);
-      if (transRes.data) setTranscripts(transRes.data);
-      if (decRes.data) setDecisions(decRes.data);
+
+      // 1. Fetch ONLY projects belonging to current user
+      const { data: userProjects, error: projErr } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (projErr) throw projErr;
+      setProjects(userProjects || []);
+
+      if (userProjects && userProjects.length > 0) {
+        const projectIds = userProjects.map(p => p.id);
+
+        // 2. Fetch transcripts ONLY for those user projects
+        const { data: userTranscripts, error: transErr } = await supabase
+          .from('transcripts')
+          .select('*')
+          .in('project_id', projectIds)
+          .order('created_at', { ascending: false });
+
+        if (transErr) throw transErr;
+        setTranscripts(userTranscripts || []);
+
+        if (userTranscripts && userTranscripts.length > 0) {
+          const transcriptIds = userTranscripts.map(t => t.id);
+
+          // 3. Fetch decisions ONLY for those transcripts
+          const { data: userDecisions, error: decErr } = await supabase
+            .from('decisions')
+            .select('*')
+            .in('transcript_id', transcriptIds)
+            .order('created_at', { ascending: false });
+
+          if (decErr) throw decErr;
+          setDecisions(userDecisions || []);
+        } else {
+          setDecisions([]);
+        }
+      } else {
+        setTranscripts([]);
+        setDecisions([]);
+      }
     } catch (error) {
       console.error('Fetch error:', error);
     } finally {
@@ -560,7 +597,7 @@ export default function Dashboard() {
     try {
       const { error } = await supabase.from('transcripts').delete().eq('id', transcriptId);
       if (error) throw error;
-      await fetchDashboardData();
+      await fetchDashboardData(user.id);
     } catch (error) {
       alert('Error deleting: ' + error.message);
     }
@@ -591,7 +628,7 @@ export default function Dashboard() {
           throw new Error(errorData.detail || 'Backend processing failed');
         }
       }
-      await fetchDashboardData();
+      await fetchDashboardData(user.id);
       setShowDropZone(false);
       alert('AI Analysis Complete!');
     } catch (error) {
@@ -690,7 +727,7 @@ export default function Dashboard() {
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-200">
             <div className="w-4 h-4 bg-white rounded-sm rotate-45" />
           </div>
-          <span className="font-bold text-lg tracking-tight">Recall</span>
+          <span className="font-bold text-lg tracking-tight">MeetHub</span>
         </div>
 
         <nav className="flex-1 space-y-1">
