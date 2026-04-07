@@ -1,7 +1,6 @@
 # Meeting Intelligence Hub
 
-## Project Title
-**Meeting Intelligence Hub (MIH)** - An AI-powered platform for analyzing meeting transcripts and extracting actionable insights.
+ An AI-powered platform for analyzing meeting transcripts and extracting actionable insights.
 
 ---
 
@@ -39,20 +38,20 @@ The platform provides a seamless upload experience where users can submit `.txt`
 - **Uvicorn** - ASGI server
 - **Groq API** - AI model for insight extraction (llama-3.1-8b-instant)
 - **Supabase Python Client** - Database and auth integration
+- **Hugging Face Inference API**
 
 
 ### Database
 - **Supabase** (PostgreSQL) - Cloud database with:
   - **projects** - Project management
   - **transcripts** - Meeting transcript storage
+  - **transcript_chunks** - stores chunks of transcript extracted
   - **decisions** - Extracted decisions and action items
   - **messages** - Chat history (future feature)
   - **sentiment_segments** - Sentiment analysis results (future feature)
 
 ### Authentication
 - **Supabase Auth** - Social login (Google OAuth) and email/password authentication
-
----
 
 ## Setup Instructions
 
@@ -113,6 +112,7 @@ Create `backend/.env`:
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-anon-key
 GROQ_API_KEY=gsk_your-groq-api-key
+HF_TOKEN=your_huggingface_token
 ```
 
 **How to get credentials:**
